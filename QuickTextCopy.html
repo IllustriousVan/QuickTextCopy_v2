@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>快速文本复制工具</title>
+    <link rel="stylesheet" href="styles.css"> <!-- 关联外部CSS文件 -->
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        .category {
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .category-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .button-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .copy-button {
+            padding: 10px;
+            font-size: 14px;
+            margin-right: 5px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .copy-button:hover {
+            background-color: #45a049;
+        }
+
+        .menu-content {
+            display: none;
+            position: absolute;
+            background-color: #f1f1f1;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+        }
+
+        .menu-content button {
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .menu-content button:hover {
+            background-color: #0056b3;
+        }
+
+        .menu {
+            position: relative;
+            display: inline-block;
+        }
+
+        .menu:hover .menu-content {
+            display: block;
+        }
+
+        #add-category-btn, #save-json-btn, #load-json-btn {
+            margin-bottom: 20px;
+        }
+
+        input[type="file"] {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+<h1>快速文本复制工具</h1>
+
+<button id="add-category-btn">新增类别</button>
+<button id="save-json-btn">保存为JSON文件</button>
+<input type="file" id="load-json-btn" accept=".json">
+
+<div id="categories-container"></div>
+
+<script>
+    // 全局变量
+    let categoriesData = [];
+
+    // 显示类别和按钮
+    function displayCategories() {
+        const container = document.getElementById('categories-container');
+        container.innerHTML = '';
+
+        categoriesData.forEach((category, categoryIndex) => {
+            const categoryDiv = document.createElement('div');
+            categoryDiv.className = 'category';
+
+            const titleDiv = document.createElement('div');
+            titleDiv.className = 'category-title';
+
+            const titleText = document.createElement('span');
+            titleText.textContent = category.name;
+
+            const deleteCategoryBtn = document.createElement('button');
+            deleteCategoryBtn.textContent = '删除类别';
+            deleteCategoryBtn.addEventListener('click', () => {
+                if (confirm("你确定要删除此类别及其按钮吗？")) {
+                    categoriesData.splice(categoryIndex, 1);
+                    displayCategories();
+                }
+            });
+
+            titleDiv.appendChild(titleText);
+            titleDiv.appendChild(deleteCategoryBtn);
+            categoryDiv.appendChild(titleDiv);
+
+            const buttonContainer = document.createElement('div');
+            buttonContainer.className = 'button-container';
+
+            category.buttons.forEach((button, buttonIndex) => {
+                const buttonDiv = document.createElement('div');
+                buttonDiv.className = 'button-container';
+
+                const copyButton = document.createElement('button');
+                copyButton.className = 'copy-button';
+                copyButton.textContent = button.name;
+                copyButton.addEventListener('click', () => copyToClipboard(button.text));
+
+                const menuDiv = document.createElement('div');
+                menuDiv.className = 'menu';
+                const menuButton = document.createElement('button');
+                menuButton.textContent = '...';
+                menuDiv.appendChild(menuButton);
+
+                const menuContent = document.createElement('div');
+                menuContent.className = 'menu-content';
+
+                const moveUpBtn = document.createElement('button');
+                moveUpBtn.textContent = '上移';
+                moveUpBtn.addEventListener('click', () => moveButton(categoryIndex, buttonIndex, 'up'));
+
+                const moveDownBtn = document.createElement('button');
+                moveDownBtn.textContent = '下移';
+                moveDownBtn.addEventListener('click', () => moveButton(categoryIndex, buttonIndex, 'down'));
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.textContent = '删除';
+                deleteBtn.addEventListener('click', () => {
+                    if (confirm("你确定要删除此按钮吗？")) {
+                        category.buttons.splice(buttonIndex, 1);
+                        displayCategories();
+                    }
+                });
+
+                menuContent.appendChild(moveUpBtn);
+                menuContent.appendChild(moveDownBtn);
+                menuContent.appendChild(deleteBtn);
+                menuDiv.appendChild(menuContent);
+
+                buttonDiv.appendChild(copyButton);
+                buttonDiv.appendChild(menuDiv);
+                buttonContainer.appendChild(buttonDiv);
+            });
+
+            const addButtonBtn = document.createElement('button');
+            addButtonBtn.textContent = '新增按钮';
+            addButtonBtn.addEventListener('click', () => addButton(categoryIndex));
+
+            categoryDiv.appendChild(buttonContainer);
+            categoryDiv.appendChild(addButtonBtn);
+            container.appendChild(categoryDiv);
+        });
+    }
+
+    // 复制文本到剪贴板
+    function copyToClipboard(text) {
+        navigator.clipboard.writeText(text).catch(err => {
+            console.error("复制失败: ", err);
+        });
+    }
+
+    // 新增类别
+    document.getElementById('add-category-btn').addEventListener('click', () => {
+        const categoryName = prompt("请输入类别名称：");
+        if (categoryName) {
+            categoriesData.push({ name: categoryName, buttons: [] });
+            displayCategories();
+        }
+    });
+
+    // 新增按钮
+    function addButton(categoryIndex) {
+        const buttonName = prompt("请输入按钮名称：");
+        const textToCopy = prompt("请输入要绑定的文本：");
+
+        if (buttonName && textToCopy) {
+            categoriesData[categoryIndex].buttons.push({ name: buttonName, text: textToCopy });
+            displayCategories();
+        } else {
+            alert("请确保按钮名称和文本都已输入。");
+        }
+    }
+
+    // 移动按钮
+    function moveButton(categoryIndex, buttonIndex, direction) {
+        const buttons = categoriesData[categoryIndex].buttons;
+        if (direction === 'up' && buttonIndex > 0) {
+            [buttons[buttonIndex - 1], buttons[buttonIndex]] = [buttons[buttonIndex], buttons[buttonIndex - 1]];
+        } else if (direction === 'down' && buttonIndex < buttons.length - 1) {
+            [buttons[buttonIndex + 1], buttons[buttonIndex]] = [buttons[buttonIndex], buttons[buttonIndex + 1]];
+        }
+        displayCategories();
+    }
+
+    // 保存到JSON文件
+    document.getElementById('save-json-btn').addEventListener('click', () => {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(categoriesData));
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.setAttribute('href', dataStr);
+        downloadAnchor.setAttribute('download', 'categories_data.json');
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+    });
+
+    // 从JSON文件加载数据
+    document.getElementById('load-json-btn').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                categoriesData = JSON.parse(e.target.result);
+                displayCategories();
+            } catch (err) {
+                alert("无效的JSON文件");
+            }
+        };
+        if (file) {
+            reader.readAsText(file);
+        }
+    });
+
+</script>
+
+</body>
+</html>
